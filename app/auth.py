@@ -30,15 +30,18 @@ def create_access_token(user_id:int) ->str:
     )
     
     
-
 def decode_access_token(token: str) -> int:
-    decoded = jwt.decode(
-        token,
-        SECRET_KEY,
-        algorithms=["HS256"]
-    )
+    try:
+        decoded = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
 
-    return int(decoded["sub"])
+        return int(decoded["sub"])
+
+    except jwt.InvalidTokenError:
+        raise ValueError("Invalid token")
     
 
 
