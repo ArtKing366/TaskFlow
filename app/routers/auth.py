@@ -18,7 +18,7 @@ def register(user_data : UserCreate, db:Session = Depends(get_db)):
     existing_user = (
         db.query(User)
         .filter(User.email ==user_data.email )
-        .first
+        .first()
     )
     
     if existing_user is not None:
