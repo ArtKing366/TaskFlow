@@ -27,11 +27,11 @@ def register(user_data : UserCreate, db:Session = Depends(get_db)):
             detail="Email already exists"
         )
 
-    heashed_password = hash_password(user_data.password)
+    hashed_password = hash_password(user_data.password)
     
     user = User(
         email = user_data.email,
-        heashed_password = heashed_password
+        hashed_password = hashed_password
     )
     
     db.add(user)

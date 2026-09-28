@@ -1,8 +1,11 @@
-from pwdlib import PasswordHash
+import os
+from datetime import datetime, timedelta, timezone
+
 import jwt
-from datetime import datetime,timedelta, timezone
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, oauth2
+from fastapi.security import OAuth2PasswordBearer
+from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,7 +15,10 @@ from app.models import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-SECRET_KEY =""
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set")
 
 password_hash = PasswordHash.recommended()
 
@@ -22,7 +28,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return password_hash.hash(password, hashed_password)
+    return password_hash.verify(password, hashed_password)
 
 
 def create_access_token(user_id:int) ->str:
