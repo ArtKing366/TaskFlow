@@ -113,12 +113,11 @@ def remove_member(workspace_id: int,user_id: int,current_user: User = Depends(ge
         
     )
     
-    if membership is None(
+    if membership is None:
         raise HTTPException(
             status_code=404,
             detail="membership not found"
         )
-    )    
     
     db.delete(membership)
     db.commit()
