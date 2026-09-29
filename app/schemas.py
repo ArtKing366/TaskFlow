@@ -7,6 +7,10 @@ from app.models import Role, TaskPriority, TaskStatus
 
 class UserBase(BaseModel):
     email: str
+    
+class MemberAdd(BaseModel):
+    user_id: int
+    role: Role
 
 
 class UserCreate(UserBase):
