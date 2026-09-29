@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -49,8 +48,8 @@ def get_workspace(
     return worksapce
 
 
-@router.get("/workspace_id", response_model=WorkspaceResponse)
-def get_workspace(
+@router.get("/{workspace_id}", response_model=WorkspaceResponse)
+def get_workspace_id(
     workspace_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -98,19 +97,19 @@ def add_member(
     return membership
 
 
-@router.delete("/{id}/members/{user_id}")
+@router.delete("/{workspace_id}/members/{user_id}")
 def remove_member(workspace_id: int,user_id: int,current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),):
     
     require_admin(current_user, workspace_id, db)
     
     membership = (
-        db.query(Membership).filter(
+        db.query(Membership)
+        .filter(
             Membership.user_id == user_id,
             Membership.workspace_id == workspace_id
-            
         )
-        
+        .first()
     )
     
     if membership is None:
@@ -125,7 +124,7 @@ def remove_member(workspace_id: int,user_id: int,current_user: User = Depends(ge
     return{"detail" : "Member has been removed"}
 
 
-@router.patch("/{id}/members/{user_id}/role")
+@router.patch("/{workspace_id}/members/{user_id}/role")
 def update_user_role(workspace_id:int, user_id:int,role_data: MembershipUpdate, current_user : User = Depends(get_current_user),
                      db:Session = Depends(get_db)):
 

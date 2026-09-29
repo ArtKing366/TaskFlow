@@ -17,7 +17,7 @@ def is_workspace_member(user: User,workspace_id: int,db: Session):
 def require_member(user:User, workspace_id:int, db:Session):
     membership = is_workspace_member(user,workspace_id,db)
     if membership is None:
-        return HTTPException(
+        raise HTTPException(
             status_code=403,
             detail="Not a member workspce"
         )
@@ -27,6 +27,13 @@ def require_member(user:User, workspace_id:int, db:Session):
 
 def require_admin(user:User, workspace_id:int, db:Session):
     membership = is_workspace_member(user,workspace_id,db)
+    
+    if membership is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Not a workspace member"
+        )
+    
     if membership.role not in (Role.admin, Role.owner):
         raise HTTPException(
             status_code=403,
