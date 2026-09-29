@@ -6,7 +6,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Membership, Role, User, Workspace
 from app.permissions import is_workspace_member, require_admin
-from app.schemas import WorkspaceCreate, WorkspaceResponse, MemberAdd
+from app.schemas import WorkspaceCreate, WorkspaceResponse, MemberAdd,MembershipUpdate
 from fastapi import Depends, HTTPException
 
 
@@ -126,5 +126,32 @@ def remove_member(workspace_id: int,user_id: int,current_user: User = Depends(ge
 
 
 @router.patch("/{id}/members/{user_id}/role")
-def patch():
-    pass
+def update_user_role(workspace_id:int, user_id:int,role_data: MembershipUpdate, current_user : User = Depends(get_current_user),
+                     db:Session = Depends(get_db)):
+
+    require_admin(
+        current_user,
+        workspace_id,
+        db
+    )
+    
+    membership = (
+        db.query(Membership).filter(
+            Membership.user_id == user_id,
+            Membership.workspace_id == workspace_id
+        ).first()
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status_code=404,
+            detail ="Membership not found"
+        )
+        
+    membership.role = role_data.role
+
+    db.commit()
+    db.refresh(membership)
+    
+    return membership
+
