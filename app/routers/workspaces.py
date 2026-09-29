@@ -34,3 +34,16 @@ def create_workspace(
     db.refresh(workspace)
 
     return workspace
+
+
+@router.get("")
+def get_workspace(current_user:User = Depends(get_current_user), db:Session = Depends(get_db)):
+    worksapce = (
+        db.query(Workspace)
+        .join(Membership)
+        .filter(Membership.user_id == current_user.id)
+        .all()
+        
+    )
+    
+    return worksapce
