@@ -130,7 +130,19 @@ def get_tasks(db: Session, project_id: int, workspace_id: int):
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
     return tasks
 
-def get_task():
-    
-    pass
+def get_task(db: Session, task_id: int, workspace_id: int):
+    task = (
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Task.id == task_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return task
 
