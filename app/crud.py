@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Project, Workspace
+from app.models import Project, Workspace,Task
 from app.schemas import ProjectCreate,ProjectUpdate
 
 def is_workspace_exist(db: Session, workspace_id: int):
@@ -113,4 +113,24 @@ def delete_project(db:Session,project_id: int):
     db.commit()
     
 
+
+def get_tasks(db: Session, project_id: int, workspace_id: int):
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    return tasks
+
+def get_task():
+    
+    pass
 
