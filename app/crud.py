@@ -2,8 +2,10 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Project, Workspace,Task
-from app.schemas import ProjectCreate,ProjectUpdate
+from app.models import Project, Workspace,Task,User
+from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate
+
+from app.permissions import is_workspace_member
 
 def is_workspace_exist(db: Session, workspace_id: int):
     workspace = (
@@ -12,6 +14,7 @@ def is_workspace_exist(db: Session, workspace_id: int):
         .first()
     )
     return workspace
+
 
 
 def get_projects(db: Session, workspace_id: int):
@@ -145,4 +148,60 @@ def get_task(db: Session, task_id: int, workspace_id: int):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return task
+
+
+def create_task(db: Session, task_create: TaskCreate):
+    project = (
+    db.query(Project)
+    .filter(Project.id == task_create.project_id)
+    .first()
+    )
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found",
+        )
+    if task_create.assignee_id is not None:
+        assignee = (
+            db.query(User)
+            .filter(User.id == task_create.assignee_id)
+            .first()
+    )
+
+    if assignee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignee not found",
+        )
+
+    membership = is_workspace_member(
+        assignee,
+        project.workspace_id,
+        db,
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Assignee is not a member of this workspace",
+        )
+    c_task = Task(
+        project_id=task_create.project_id,
+        title=task_create.title,
+        description=task_create.description,
+        status=task_create.status,
+        priority=task_create.priority,
+        deadline=task_create.deadline,
+        assignee_id=task_create.assignee_id,
+    )
+
+
+    
+    db.add(c_task)
+    db.commit()
+    db.refresh(c_task)
+
+    return c_task
+
 
