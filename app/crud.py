@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Project, Workspace
-
+from app.schemas import ProjectCreate,ProjectUpdate
 
 def is_workspace_exist(db: Session, workspace_id: int):
     workspace = (
@@ -60,3 +60,26 @@ def get_project(
         )
 
     return project
+
+def create_project(db:Session, project_data:ProjectCreate):
+    c_project = Project(
+        workspace_id = project_data.workspace_id,
+        title = project_data.title,
+        description = project_data.description
+    )
+    
+    db.add(c_project)
+    db.commit()
+    db.refresh(c_project)
+    
+    return c_project
+
+
+def update_project(db:Session, project_data:ProjectUpdate):
+
+    
+    pass
+def delete_project():
+    pass
+
+
