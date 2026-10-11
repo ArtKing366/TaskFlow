@@ -98,7 +98,19 @@ def update_project(db:Session,project_id: int, project_data:ProjectUpdate):
 
     return u_project
 
-def delete_project():
-    pass
+def delete_project(db:Session,project_id: int):
+    d_project = (db.query(Project).filter(
+        Project.id == project_id
+    ).first())
+    
+    if d_project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found"
+        )
+    
+    db.delete(d_project)
+    db.commit()
+    
 
 
