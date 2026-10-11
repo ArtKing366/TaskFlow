@@ -43,11 +43,7 @@ def require_admin(user:User, workspace_id:int, db:Session):
     return membership
 
 
-def require_owner(
-    user: User,
-    workspace_id: int,
-    db: Session
-) -> Membership:
+def require_owner(user: User,workspace_id: int,db: Session) -> Membership:
     membership = require_member(user, workspace_id, db)
 
     if membership.role != Role.owner:
@@ -55,6 +51,7 @@ def require_owner(
             status_code=403,
             detail="Owner access required"
         )
+
 
     return membership
 
