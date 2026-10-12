@@ -2,20 +2,30 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Project, Workspace,Task,User,TaskStatus
-from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority
-
+from app.models import (
+    Project,
+    Workspace,
+    Task,
+    TaskTag,
+    User,
+    TaskStatus,
+)
+from app.schemas import (
+    ProjectCreate,
+    ProjectUpdate,
+    TaskCreate,
+    TaskUpdate,
+    TaskPriority,
+)
 from app.permissions import is_workspace_member
 
+
 def is_workspace_exist(db: Session, workspace_id: int):
-    workspace = (
+    return (
         db.query(Workspace)
         .filter(Workspace.id == workspace_id)
         .first()
     )
-    return workspace
-
-
 
 def get_projects(db: Session, workspace_id: int):
     workspace = is_workspace_exist(db, workspace_id)
@@ -26,12 +36,11 @@ def get_projects(db: Session, workspace_id: int):
             detail="Workspace not found",
         )
 
-    projects = (
+    return (
         db.query(Project)
         .filter(Project.workspace_id == workspace_id)
         .all()
     )
-    return projects
 
 
 def get_project(
@@ -39,14 +48,6 @@ def get_project(
     project_id: int,
     workspace_id: int,
 ):
-    workspace = is_workspace_exist(db, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Workspace not found",
-        )
-
     project = (
         db.query(Project)
         .filter(
@@ -64,24 +65,40 @@ def get_project(
 
     return project
 
-def create_project(db:Session, project_data:ProjectCreate):
+def create_project(db: Session, project_data: ProjectCreate):
+    workspace = is_workspace_exist(db, project_data.workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
     c_project = Project(
-        workspace_id = project_data.workspace_id,
-        title = project_data.title,
-        description = project_data.description
+        workspace_id=project_data.workspace_id,
+        title=project_data.title,
+        description=project_data.description,
     )
-    
+
     db.add(c_project)
     db.commit()
     db.refresh(c_project)
-    
+
     return c_project
 
 
-def update_project(db:Session,project_id: int, project_data:ProjectUpdate):
+def update_project(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+    project_data: ProjectUpdate,
+):
     u_project = (
         db.query(Project)
-        .filter(Project.id == project_id)
+        .filter(
+            Project.id == project_id,
+            Project.workspace_id == workspace_id,
+        )
         .first()
     )
 
@@ -101,23 +118,54 @@ def update_project(db:Session,project_id: int, project_data:ProjectUpdate):
 
     return u_project
 
-def delete_project(db:Session,project_id: int):
-    d_project = (db.query(Project).filter(
-        Project.id == project_id
-    ).first())
-    
+
+def delete_project(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+):
+    d_project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
     if d_project is None:
         raise HTTPException(
             status_code=404,
-            detail="Project not found"
+            detail="Project not found",
         )
-    
+
+    task_ids = [
+        task_id
+        for (task_id,) in (
+            db.query(Task.id)
+            .filter(Task.project_id == project_id)
+            .all()
+        )
+    ]
+
+    if task_ids:
+        db.query(TaskTag).filter(
+            TaskTag.task_id.in_(task_ids)
+        ).delete(synchronize_session=False)
+
+        db.query(Task).filter(
+            Task.project_id == project_id
+        ).delete(synchronize_session=False)
+
     db.delete(d_project)
     db.commit()
-    
 
-
-def get_tasks(db: Session, project_id: int, workspace_id: int):
+    return {"detail": "Project deleted successfully"}
+def get_tasks(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+):
     project = (
         db.query(Project)
         .filter(
@@ -128,12 +176,23 @@ def get_tasks(db: Session, project_id: int, workspace_id: int):
     )
 
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found",
+        )
 
-    tasks = db.query(Task).filter(Task.project_id == project_id).all()
-    return tasks
+    return (
+        db.query(Task)
+        .filter(Task.project_id == project_id)
+        .all()
+    )
 
-def get_task(db: Session, task_id: int, workspace_id: int):
+
+def get_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+):
     task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -145,15 +204,25 @@ def get_task(db: Session, task_id: int, workspace_id: int):
     )
 
     if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
 
     return task
 
 
-def create_task(db: Session, task_create: TaskCreate):
+def create_task(
+    db: Session,
+    task_create: TaskCreate,
+    workspace_id: int,
+):
     project = (
         db.query(Project)
-        .filter(Project.id == task_create.project_id)
+        .filter(
+            Project.id == task_create.project_id,
+            Project.workspace_id == workspace_id,
+        )
         .first()
     )
 
@@ -178,7 +247,7 @@ def create_task(db: Session, task_create: TaskCreate):
 
         membership = is_workspace_member(
             assignee,
-            project.workspace_id,
+            workspace_id,
             db,
         )
 
@@ -205,49 +274,94 @@ def create_task(db: Session, task_create: TaskCreate):
     return c_task
 
 
-def update_task(db:Session,task_id: int, task_update: TaskUpdate):
+def update_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+    task_update: TaskUpdate,
+):
     u_task = (
-        db.query(Task).filter(
-            Task.id == task_id
-        ).first()
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Task.id == task_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
     )
-    
+
     if u_task is None:
         raise HTTPException(
             status_code=404,
-            detail="Task was not found"
+            detail="Task not found",
         )
-        
+
     update_data = task_update.model_dump(exclude_unset=True)
-    for field,value in update_data.items():
-        setattr(u_task,field,value)
-    
+
+    if (
+        "assignee_id" in update_data
+        and update_data["assignee_id"] is not None
+    ):
+        assignee = (
+            db.query(User)
+            .filter(User.id == update_data["assignee_id"])
+            .first()
+        )
+
+        if assignee is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Assignee not found",
+            )
+
+        membership = is_workspace_member(
+            assignee,
+            workspace_id,
+            db,
+        )
+
+        if membership is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Assignee is not a member of this workspace",
+            )
+
+    for field, value in update_data.items():
+        setattr(u_task, field, value)
+
     db.commit()
     db.refresh(u_task)
-    return u_task
-    
 
-def complete_task(db:Session, task_id:int ):
+    return u_task
+
+
+def complete_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+):
     c_task = (
-        db.query(Task).filter(
-            Task.id == task_id
-        ).first()
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Task.id == task_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
     )
-    
+
     if c_task is None:
         raise HTTPException(
             status_code=404,
-            detail = "Task was not found"
+            detail="Task not found",
         )
-    
-    c_task.status = TaskStatus.done    
-    
-    db.commit()
 
+    c_task.status = TaskStatus.done
+
+    db.commit()
     db.refresh(c_task)
 
     return c_task
-
 
 
 def assign_task(
@@ -303,24 +417,64 @@ def assign_task(
 
     return a_task
 
-def delete_task(db: Session, task_id: int):
-    d_task = db.query(Task).filter(Task.id == task_id).first()
+def delete_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+):
+    d_task = (
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Task.id == task_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
 
     if d_task is None:
         raise HTTPException(
             status_code=404,
-            detail="Task was not found",
+            detail="Task not found",
         )
+
+    db.query(TaskTag).filter(
+        TaskTag.task_id == task_id
+    ).delete(synchronize_session=False)
 
     db.delete(d_task)
     db.commit()
 
     return {"detail": "Task deleted successfully"}
 
-def filter_tasks(db: Session,project_id: int,status: TaskStatus | None = None,
-    priority: TaskPriority | None = None,assignee_id: int | None = None,search: str | None = None,):
-    
-    query = db.query(Task).filter(Task.project_id == project_id)
+
+def filter_tasks(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+    status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    assignee_id: int | None = None,
+    search: str | None = None,
+):
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found",
+        )
+
+    query = db.query(Task).filter(
+        Task.project_id == project_id
+    )
 
     if status is not None:
         query = query.filter(Task.status == status)
@@ -331,8 +485,9 @@ def filter_tasks(db: Session,project_id: int,status: TaskStatus | None = None,
     if assignee_id is not None:
         query = query.filter(Task.assignee_id == assignee_id)
 
-    if search is not None:
-        query = query.filter(Task.title.ilike(f"%{search}%"))
+    if search is not None and search.strip():
+        query = query.filter(
+            Task.title.ilike(f"%{search.strip()}%")
+        )
 
     return query.all()
-
