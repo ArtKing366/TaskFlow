@@ -248,5 +248,57 @@ def complete_task(db:Session, task_id:int ):
 
     return c_task
 
-def assign_task():
-    pass
+
+
+def assign_task(
+    db: Session,
+    task_id: int,
+    assign_id: int,
+    workspace_id: int,
+):
+    a_task = (
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Task.id == task_id,
+            Project.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if a_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
+    assignee = (
+        db.query(User)
+        .filter(User.id == assign_id)
+        .first()
+    )
+
+    if assignee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+        )
+
+    membership = is_workspace_member(
+        assignee,
+        workspace_id,
+        db,
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not a member of this workspace",
+        )
+
+    a_task.assignee_id = assignee.id
+
+    db.commit()
+    db.refresh(a_task)
+
+    return a_task
