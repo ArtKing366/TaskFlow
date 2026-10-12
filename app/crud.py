@@ -302,3 +302,17 @@ def assign_task(
     db.refresh(a_task)
 
     return a_task
+
+def delete_task(db: Session, task_id: int):
+    d_task = db.query(Task).filter(Task.id == task_id).first()
+
+    if d_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task was not found",
+        )
+
+    db.delete(d_task)
+    db.commit()
+
+    return {"detail": "Task deleted successfully"}
