@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Project, Workspace,Task,User,TaskStatus
-from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate
+from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority
 
 from app.permissions import is_workspace_member
 
@@ -152,9 +152,9 @@ def get_task(db: Session, task_id: int, workspace_id: int):
 
 def create_task(db: Session, task_create: TaskCreate):
     project = (
-    db.query(Project)
-    .filter(Project.id == task_create.project_id)
-    .first()
+        db.query(Project)
+        .filter(Project.id == task_create.project_id)
+        .first()
     )
 
     if project is None:
@@ -162,30 +162,32 @@ def create_task(db: Session, task_create: TaskCreate):
             status_code=404,
             detail="Project not found",
         )
+
     if task_create.assignee_id is not None:
         assignee = (
             db.query(User)
             .filter(User.id == task_create.assignee_id)
             .first()
-    )
-
-    if assignee is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Assignee not found",
         )
 
-    membership = is_workspace_member(
-        assignee,
-        project.workspace_id,
-        db,
-    )
+        if assignee is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Assignee not found",
+            )
 
-    if membership is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Assignee is not a member of this workspace",
+        membership = is_workspace_member(
+            assignee,
+            project.workspace_id,
+            db,
         )
+
+        if membership is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Assignee is not a member of this workspace",
+            )
+
     c_task = Task(
         project_id=task_create.project_id,
         title=task_create.title,
@@ -196,8 +198,6 @@ def create_task(db: Session, task_create: TaskCreate):
         assignee_id=task_create.assignee_id,
     )
 
-
-    
     db.add(c_task)
     db.commit()
     db.refresh(c_task)
@@ -316,3 +316,23 @@ def delete_task(db: Session, task_id: int):
     db.commit()
 
     return {"detail": "Task deleted successfully"}
+
+def filter_tasks(db: Session,project_id: int,status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,assignee_id: int | None = None,search: str | None = None,):
+    
+    query = db.query(Task).filter(Task.project_id == project_id)
+
+    if status is not None:
+        query = query.filter(Task.status == status)
+
+    if priority is not None:
+        query = query.filter(Task.priority == priority)
+
+    if assignee_id is not None:
+        query = query.filter(Task.assignee_id == assignee_id)
+
+    if search is not None:
+        query = query.filter(Task.title.ilike(f"%{search}%"))
+
+    return query.all()
+
