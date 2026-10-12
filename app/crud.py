@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Project, Workspace,Task,User
+from app.models import Project, Workspace,Task,User,TaskStatus
 from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate
 
 from app.permissions import is_workspace_member
@@ -227,10 +227,26 @@ def update_task(db:Session,task_id: int, task_update: TaskUpdate):
     return u_task
     
 
-def complete_task(db:Session, task_id:int, ):
+def complete_task(db:Session, task_id:int ):
+    c_task = (
+        db.query(Task).filter(
+            Task.id == task_id
+        ).first()
+    )
     
-    pass
+    if c_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail = "Task was not found"
+        )
+    
+    c_task.status = TaskStatus.done    
+    
+    db.commit()
 
+    db.refresh(c_task)
+
+    return c_task
 
 def assign_task():
     pass
