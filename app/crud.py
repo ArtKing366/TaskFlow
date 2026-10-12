@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Project, Workspace,Task,User
-from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate
+from app.schemas import ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate
 
 from app.permissions import is_workspace_member
 
@@ -205,3 +205,32 @@ def create_task(db: Session, task_create: TaskCreate):
     return c_task
 
 
+def update_task(db:Session,task_id: int, task_update: TaskUpdate):
+    u_task = (
+        db.query(Task).filter(
+            Task.id == task_id
+        ).first()
+    )
+    
+    if u_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task was not found"
+        )
+        
+    update_data = task_update.model_dump(exclude_unset=True)
+    for field,value in update_data.items():
+        setattr(u_task,field,value)
+    
+    db.commit()
+    db.refresh(u_task)
+    return u_task
+    
+
+def complete_task(db:Session, task_id:int, ):
+    
+    pass
+
+
+def assign_task():
+    pass
