@@ -85,6 +85,7 @@ def update_project(
         project_id,
         workspace_id,
         project_data,
+        current_user.id,
     )
 
 
@@ -97,4 +98,4 @@ def delete_project(
 ):
     require_editor(current_user, workspace_id, db)
 
-    return crud.delete_project(db, project_id, workspace_id)
+    return crud.delete_project(db, project_id, workspace_id, current_user.id,)

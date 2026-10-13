@@ -85,7 +85,13 @@ def create_project(
     return c_project
 
 
-def update_project(db: Session,project_id: int,workspace_id: int,project_data: ProjectUpdate,):
+def update_project(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+    project_data: ProjectUpdate,
+    user_id: int,
+):
     u_project = (
         db.query(Project)
         .filter(
@@ -106,13 +112,29 @@ def update_project(db: Session,project_id: int,workspace_id: int,project_data: P
     for field, value in update_data.items():
         setattr(u_project, field, value)
 
+    db.flush()
+
+    create_audit_log(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="project.updated",
+        entity_type="project",
+        entity_id=u_project.id,
+    )
+
     db.commit()
     db.refresh(u_project)
 
     return u_project
 
 
-def delete_project(db: Session, project_id: int, workspace_id: int,):
+def delete_project(
+    db: Session,
+    project_id: int,
+    workspace_id: int,
+    user_id: int,
+):
     d_project = (
         db.query(Project)
         .filter(
@@ -128,28 +150,32 @@ def delete_project(db: Session, project_id: int, workspace_id: int,):
             detail="Project not found",
         )
 
-    task_ids = [
-        task_id
-        for (task_id,) in (
-            db.query(Task.id)
-            .filter(Task.project_id == project_id)
-            .all()
+    db.query(TaskTag).filter(
+        TaskTag.task_id.in_(
+            db.query(Task.id).filter(
+                Task.project_id == project_id
+            )
         )
-    ]
+    ).delete(synchronize_session=False)
 
-    if task_ids:
-        db.query(TaskTag).filter(
-            TaskTag.task_id.in_(task_ids)
-        ).delete(synchronize_session=False)
+    db.query(Task).filter(
+        Task.project_id == project_id
+    ).delete(synchronize_session=False)
 
-        db.query(Task).filter(
-            Task.project_id == project_id
-        ).delete(synchronize_session=False)
+    create_audit_log(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="project.deleted",
+        entity_type="project",
+        entity_id=d_project.id,
+    )
 
     db.delete(d_project)
     db.commit()
 
     return {"detail": "Project deleted successfully"}
+
 def get_tasks(
     db: Session,
     project_id: int,
