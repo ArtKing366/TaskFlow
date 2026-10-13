@@ -309,11 +309,7 @@ def update_task(
     return u_task
 
 
-def complete_task(
-    db: Session,
-    task_id: int,
-    workspace_id: int,
-):
+def complete_task(db: Session,task_id: int,workspace_id: int,user_id:int):
     c_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
