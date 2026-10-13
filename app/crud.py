@@ -48,7 +48,11 @@ def get_project(db: Session,project_id: int,workspace_id: int,):
 
     return project
 
-def create_project(db: Session, project_data: ProjectCreate):
+def create_project(
+    db: Session,
+    project_data: ProjectCreate,
+    user_id: int,
+):
     workspace = is_workspace_exist(db, project_data.workspace_id)
 
     if workspace is None:
@@ -64,6 +68,17 @@ def create_project(db: Session, project_data: ProjectCreate):
     )
 
     db.add(c_project)
+    db.flush()
+
+    create_audit_log(
+        db=db,
+        workspace_id=c_project.workspace_id,
+        user_id=user_id,
+        action="project.created",
+        entity_type="project",
+        entity_id=c_project.id,
+    )
+
     db.commit()
     db.refresh(c_project)
 

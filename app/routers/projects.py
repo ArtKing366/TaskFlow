@@ -55,7 +55,7 @@ def create_project(
             detail="Workspace ID in the URL and request body must match",
         )
 
-    return crud.create_project(db, project_data)
+    return crud.create_project(db, project_data,current_user.id,)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
