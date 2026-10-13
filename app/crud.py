@@ -2,21 +2,8 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import (
-    Project,
-    Workspace,
-    Task,
-    TaskTag,
-    User,
-    TaskStatus,
-)
-from app.schemas import (
-    ProjectCreate,
-    ProjectUpdate,
-    TaskCreate,
-    TaskUpdate,
-    TaskPriority,
-)
+from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog)
+from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,)
 from app.permissions import is_workspace_member
 
 
@@ -43,11 +30,7 @@ def get_projects(db: Session, workspace_id: int):
     )
 
 
-def get_project(
-    db: Session,
-    project_id: int,
-    workspace_id: int,
-):
+def get_project(db: Session,project_id: int,workspace_id: int,):
     project = (
         db.query(Project)
         .filter(
@@ -87,12 +70,7 @@ def create_project(db: Session, project_data: ProjectCreate):
     return c_project
 
 
-def update_project(
-    db: Session,
-    project_id: int,
-    workspace_id: int,
-    project_data: ProjectUpdate,
-):
+def update_project(db: Session,project_id: int,workspace_id: int,project_data: ProjectUpdate,):
     u_project = (
         db.query(Project)
         .filter(
@@ -119,11 +97,7 @@ def update_project(
     return u_project
 
 
-def delete_project(
-    db: Session,
-    project_id: int,
-    workspace_id: int,
-):
+def delete_project(db: Session, project_id: int, workspace_id: int,):
     d_project = (
         db.query(Project)
         .filter(
@@ -491,3 +465,20 @@ def filter_tasks(
         )
 
     return query.all()
+
+def create_audit_log(db: Session,workspace_id: int,user_id: int,action: str,entity_type: str,
+    entity_id: int,) -> AuditLog:
+    
+    audit_log = AuditLog(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
+    db.add(audit_log)
+    db.flush()
+
+    return audit_log
+
