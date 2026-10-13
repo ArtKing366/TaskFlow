@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-
+from sqlalchemy import Integer
 
 class Role(str, Enum):
     owner = "owner"

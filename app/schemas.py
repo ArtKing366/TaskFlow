@@ -160,3 +160,17 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: int | None = None
+    
+    
+    
+class AuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    workspace_id: int
+    user_id: int
+    action: str
+    entity_type: str
+    entity_id: int
+    created_at: datetime
+    
