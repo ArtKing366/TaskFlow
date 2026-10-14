@@ -1,11 +1,11 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from sqlalchemy import Integer
+from sqlalchemy import Integer,Column
 
 class Role(str, Enum):
     owner = "owner"
@@ -226,6 +226,37 @@ class AuditLog(Base):
         server_default=func.now()
     )
     
-    
+class Automation(Base):
+    __tablename__ = "automations"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id"),
+        nullable=False,
+        index=True,
+    )
+
+    name = Column(String(100), nullable=False)
+
+    trigger = Column(String(100), nullable=False)
+
+    condition = Column(JSON, nullable=True)
+
+    action = Column(JSON, nullable=False)
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
     
     
