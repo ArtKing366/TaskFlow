@@ -85,6 +85,7 @@ def create_task(
         db,
         task_data,
         workspace_id,
+        current_user.id,
     )
 
 
@@ -121,6 +122,7 @@ def update_task(
         task_id,
         workspace_id,
         task_data,
+        current_user.id,
     )
 
 
@@ -162,6 +164,7 @@ def assign_task(
         task_id,
         assign_id,
         workspace_id,
+        current_user.id,    
     )
 
 
@@ -178,4 +181,5 @@ def delete_task(
         db,
         task_id,
         workspace_id,
+        current_user.id,
     )

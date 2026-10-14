@@ -231,6 +231,7 @@ def create_task(
     db: Session,
     task_create: TaskCreate,
     workspace_id: int,
+    user_id: int,
 ):
     project = (
         db.query(Project)
@@ -283,6 +284,17 @@ def create_task(
     )
 
     db.add(c_task)
+    db.flush()
+
+    create_audit_log(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="task.created",
+        entity_type="task",
+        entity_id=c_task.id,
+    )
+
     db.commit()
     db.refresh(c_task)
 
@@ -294,6 +306,7 @@ def update_task(
     task_id: int,
     workspace_id: int,
     task_update: TaskUpdate,
+    user_id: int,
 ):
     u_task = (
         db.query(Task)
@@ -344,13 +357,28 @@ def update_task(
     for field, value in update_data.items():
         setattr(u_task, field, value)
 
+    db.flush()
+
+    create_audit_log(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="task.updated",
+        entity_type="task",
+        entity_id=u_task.id,
+    )
+
     db.commit()
     db.refresh(u_task)
 
     return u_task
 
-
-def complete_task(db: Session,task_id: int,workspace_id: int,user_id:int):
+def complete_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+    user_id: int,
+):
     c_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -367,7 +395,19 @@ def complete_task(db: Session,task_id: int,workspace_id: int,user_id:int):
             detail="Task not found",
         )
 
-    c_task.status = TaskStatus.done
+    if c_task.status != TaskStatus.done:
+        c_task.status = TaskStatus.done
+
+        db.flush()
+
+        create_audit_log(
+            db=db,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            action="task.completed",
+            entity_type="task",
+            entity_id=c_task.id,
+        )
 
     db.commit()
     db.refresh(c_task)
@@ -380,6 +420,7 @@ def assign_task(
     task_id: int,
     assign_id: int,
     workspace_id: int,
+    user_id: int,
 ):
     a_task = (
         db.query(Task)
@@ -421,17 +462,29 @@ def assign_task(
             detail="User is not a member of this workspace",
         )
 
-    a_task.assignee_id = assignee.id
+    if a_task.assignee_id != assignee.id:
+        a_task.assignee_id = assignee.id
+
+        db.flush()
+
+        create_audit_log(
+            db=db,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            action="task.assigned",
+            entity_type="task",
+            entity_id=a_task.id,
+        )
 
     db.commit()
     db.refresh(a_task)
 
     return a_task
-
 def delete_task(
     db: Session,
     task_id: int,
     workspace_id: int,
+    user_id: int,
 ):
     d_task = (
         db.query(Task)
@@ -448,6 +501,15 @@ def delete_task(
             status_code=404,
             detail="Task not found",
         )
+
+    create_audit_log(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=user_id,
+        action="task.deleted",
+        entity_type="task",
+        entity_id=d_task.id,
+    )
 
     db.query(TaskTag).filter(
         TaskTag.task_id == task_id
