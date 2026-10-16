@@ -612,8 +612,28 @@ def create_automation(
     return c_automation
 
 
-def get_automations():
-    pass
+def get_automations(
+    db: Session,
+    workspace_id: int,
+):
+    workspace = is_workspace_exist(db, workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
+    return (
+        db.query(Automation)
+        .filter(Automation.workspace_id == workspace_id)
+        .order_by(
+            Automation.created_at.desc(),
+            Automation.id.desc(),
+        )
+        .all()
+    )
+
 
 def get_automation():
     pass
