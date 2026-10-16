@@ -2,8 +2,12 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog)
-from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,)
+from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog,   
+    AuditLog,Automation,)
+
+from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,
+    AutomationCreate,AutomationUpdate,)
+
 from app.permissions import is_workspace_member
 
 
@@ -580,4 +584,46 @@ def create_audit_log(db: Session,workspace_id: int,user_id: int,action: str,enti
     db.flush()
 
     return audit_log
+
+def create_automation(
+    db: Session,
+    workspace_id: int,
+    automation_data: AutomationCreate,
+):
+    workspace = is_workspace_exist(db, workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
+    data = automation_data.model_dump(mode="json")
+
+    c_automation = Automation(
+        workspace_id=workspace_id,
+        **data,
+    )
+
+    db.add(c_automation)
+    db.commit()
+    db.refresh(c_automation)
+
+    return c_automation
+
+
+def get_automations():
+    pass
+
+def get_automation():
+    pass
+
+def update_automation():
+    pass
+
+def delete_automation():
+    pass
+
+
+
 
