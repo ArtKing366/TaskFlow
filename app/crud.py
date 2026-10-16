@@ -705,8 +705,32 @@ def update_automation(
 
     return u_automation
 
-def delete_automation():
-    pass
+def delete_automation(
+    db: Session,
+    automation_id: int,
+    workspace_id: int,
+):
+    d_automation = (
+        db.query(Automation)
+        .filter(
+            Automation.id == automation_id,
+            Automation.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if d_automation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Automation not found",
+        )
+
+    db.delete(d_automation)
+    db.commit()
+
+    return {
+        "detail": "Automation deleted successfully"
+    }
 
 
 
