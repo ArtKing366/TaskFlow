@@ -657,8 +657,53 @@ def get_automation(
 
     return automation
 
-def update_automation():
-    pass
+def update_automation(
+    db: Session,
+    automation_id: int,
+    workspace_id: int,
+    automation_data: AutomationUpdate,
+):
+    u_automation = (
+        db.query(Automation)
+        .filter(
+            Automation.id == automation_id,
+            Automation.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if u_automation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Automation not found",
+        )
+
+    update_data = automation_data.model_dump(
+        mode="json",
+        exclude_unset=True,
+    )
+
+    required_fields = {
+        "name",
+        "trigger",
+        "action",
+        "is_active",
+    }
+
+    for field in required_fields:
+        if field in update_data and update_data[field] is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} cannot be null",
+            )
+
+    for field, value in update_data.items():
+        setattr(u_automation, field, value)
+
+    db.commit()
+    db.refresh(u_automation)
+
+    return u_automation
 
 def delete_automation():
     pass
