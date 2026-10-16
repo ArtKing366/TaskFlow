@@ -635,8 +635,27 @@ def get_automations(
     )
 
 
-def get_automation():
-    pass
+def get_automation(
+    db: Session,
+    automation_id: int,
+    workspace_id: int,
+):
+    automation = (
+        db.query(Automation)
+        .filter(
+            Automation.id == automation_id,
+            Automation.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if automation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Automation not found",
+        )
+
+    return automation
 
 def update_automation():
     pass
