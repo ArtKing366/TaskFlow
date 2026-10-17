@@ -58,7 +58,7 @@ def send_notification(db: Session,automation: Automation,task: Task,workspace_id
             message=message,
         )
 
-        db.add(notification)
+    db.add(notification)
 
 
 def dispatch_event(db: Session,workspace_id: int,event_name: str,task: Task,) -> None:

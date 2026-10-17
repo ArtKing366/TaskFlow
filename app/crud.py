@@ -1,9 +1,9 @@
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-
+from app.automation_engine import dispatch_event
 from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog,   
-    AuditLog,Automation,)
+    AuditLog,Automation,Notification)
 
 from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,
     AutomationCreate,AutomationUpdate,)
@@ -377,12 +377,8 @@ def update_task(
 
     return u_task
 
-def complete_task(
-    db: Session,
-    task_id: int,
-    workspace_id: int,
-    user_id: int,
-):
+def complete_task(db: Session,task_id: int,
+    workspace_id: int,user_id: int,):
     c_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -399,21 +395,34 @@ def complete_task(
             detail="Task not found",
         )
 
-    if c_task.status != TaskStatus.done:
-        c_task.status = TaskStatus.done
+    try:
+        if c_task.status != TaskStatus.done:
+            c_task.status = TaskStatus.done
 
-        db.flush()
+            db.flush()
 
-        create_audit_log(
-            db=db,
-            workspace_id=workspace_id,
-            user_id=user_id,
-            action="task.completed",
-            entity_type="task",
-            entity_id=c_task.id,
-        )
+            create_audit_log(
+                db=db,
+                workspace_id=workspace_id,
+                user_id=user_id,
+                action="task.completed",
+                entity_type="task",
+                entity_id=c_task.id,
+            )
 
-    db.commit()
+            dispatch_event(
+                db=db,
+                workspace_id=workspace_id,
+                event_name="task.completed",
+                task=c_task,
+            )
+
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(c_task)
 
     return c_task
@@ -732,6 +741,31 @@ def delete_automation(
         "detail": "Automation deleted successfully"
     }
 
+def get_user_notifications(
+    db: Session,
+    workspace_id: int,
+    user_id: int,
+):
+    workspace = is_workspace_exist(db, workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
+    return (
+        db.query(Notification)
+        .filter(
+            Notification.workspace_id == workspace_id,
+            Notification.user_id == user_id,
+        )
+        .order_by(
+            Notification.created_at.desc(),
+            Notification.id.desc(),
+        )
+        .all()
+    )
 
 
 
