@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field,HttpUrl
 
 from app.models import Role, TaskPriority, TaskStatus
 
@@ -224,6 +224,55 @@ class NotificationResponse(BaseModel):
     task_id: int
     message: str
     is_read: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+    
+    
+    
+WebhookEvent = Literal[
+    "task.created",
+    "task.updated",
+    "task.completed",
+    "project.created",
+]
+
+
+class WebhookCreate(BaseModel):
+    url: HttpUrl
+
+    events: list[WebhookEvent] = Field(min_length=1)
+
+
+class WebhookUpdate(BaseModel):
+    url: HttpUrl | None = None
+
+    events: list[WebhookEvent] | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    is_active: bool | None = None
+
+
+class WebhookResponse(BaseModel):
+    id: int
+    workspace_id: int
+    url: HttpUrl
+    events: list[WebhookEvent]
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebhookDeliveryResponse(BaseModel):
+    id: int
+    webhook_id: int
+    event: WebhookEvent
+    status: str
+    attempts: int
+    last_error: str | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
