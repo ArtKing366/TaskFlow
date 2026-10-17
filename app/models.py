@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func, JSON
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func, JSON,Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -295,3 +295,68 @@ class Notification(Base):
         nullable=False,
     )
     
+    
+    
+    
+class Webhook(Base):
+    __tablename__ = "webhooks"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    workspace_id = Column(
+        Integer,
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    url = Column(String(2048), nullable=False)
+
+    events = Column(JSON, nullable=False)
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    webhook_id = Column(
+        Integer,
+        ForeignKey("webhooks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    event = Column(String(100), nullable=False)
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="pending",
+    )
+
+    attempts = Column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    last_error = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
