@@ -6,6 +6,10 @@ from app.routers.projects import router as projects_router
 from app.routers.tasks import router as tasks_router
 from app.routers.audit_logs import router as audit_logs_router
 from app.routers import notifications
+from app.routers import webhooks
+
+
+
 
 app = FastAPI(
     title="TaskFlow API",
@@ -26,4 +30,5 @@ app.include_router(tasks_router)
 app.include_router(audit_logs_router)
 app.include_router(automations.router)
 app.include_router(notifications.router)
+app.include_router(webhooks.router)
 

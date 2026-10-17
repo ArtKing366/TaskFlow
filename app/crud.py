@@ -9,6 +9,7 @@ from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskP
     AutomationCreate,AutomationUpdate,WebhookCreate,WebhookUpdate)
 
 from app.permissions import is_workspace_member
+from app.webhook_service import (dispatch_webhooks,project_payload,task_payload,validate_webhook_url,)
 
 
 def is_workspace_exist(db: Session, workspace_id: int):
@@ -84,6 +85,15 @@ def create_project(
     )
 
     db.commit()
+    db.refresh(c_project)
+
+    dispatch_webhooks(
+        db=db,
+        workspace_id=c_project.workspace_id,
+        event_name="project.created",
+        data=project_payload(c_project),
+    )
+
     db.refresh(c_project)
 
     return c_project
@@ -312,6 +322,7 @@ def update_task(
     task_update: TaskUpdate,
     user_id: int,
 ):
+    old_status = u_task.status
     u_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -371,9 +382,33 @@ def update_task(
         entity_type="task",
         entity_id=u_task.id,
     )
+    became_completed = (
+        old_status != TaskStatus.done
+        and u_task.status == TaskStatus.done
+    )
 
     db.commit()
     db.refresh(u_task)
+
+    if update_data:
+        event_data = task_payload(u_task)
+
+        dispatch_webhooks(
+            db=db,
+            workspace_id=workspace_id,
+            event_name="task.updated",
+            data=event_data,
+        )
+
+        if became_completed:
+            dispatch_webhooks(
+                db=db,
+                workspace_id=workspace_id,
+                event_name="task.completed",
+                data=event_data,
+            )
+
+        db.refresh(u_task)
 
     return u_task
 
@@ -394,7 +429,7 @@ def complete_task(db: Session,task_id: int,
             status_code=404,
             detail="Task not found",
         )
-
+    newly_completed = c_task.status != TaskStatus.done
     try:
         if c_task.status != TaskStatus.done:
             c_task.status = TaskStatus.done
@@ -425,8 +460,17 @@ def complete_task(db: Session,task_id: int,
 
     db.refresh(c_task)
 
-    return c_task
+    if newly_completed:
+        dispatch_webhooks(
+            db=db,
+            workspace_id=workspace_id,
+            event_name="task.completed",
+            data=task_payload(c_task),
+        )
 
+        db.refresh(c_task)
+
+    return c_task
 
 def assign_task(
     db: Session,
@@ -781,6 +825,13 @@ def create_webhook(
             detail="Workspace not found",
         )
 
+    try:
+        validate_webhook_url(str(webhook_data.url))
+    except ValueError as exc:
+        raise HTTPException(
+         status_code=422,
+         detail=str(exc),
+        )
     data = webhook_data.model_dump(mode="json")
 
     c_webhook = Webhook(
@@ -856,6 +907,7 @@ def update_webhook(
         .first()
     )
 
+
     if u_webhook is None:
         raise HTTPException(
             status_code=404,
@@ -872,7 +924,14 @@ def update_webhook(
         "events",
         "is_active",
     }
-
+    if update_data.get("url") is not None:
+        try:
+            validate_webhook_url(update_data["url"])
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=str(exc),
+            )
     for field in required_fields:
         if field in update_data and update_data[field] is None:
             raise HTTPException(
