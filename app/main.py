@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+from app.routers import automations
 from app.routers.auth import router as auth_router
 from app.routers.workspaces import router as workspaces_router
 from app.routers.projects import router as projects_router
@@ -24,3 +24,4 @@ app.include_router(workspaces_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
 app.include_router(audit_logs_router)
+app.include_router(automations.router)
