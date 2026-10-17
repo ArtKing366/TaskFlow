@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.automation_engine import dispatch_event
 from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog,   
-    AuditLog,Automation,Notification)
+    AuditLog,Automation,Notification,Webhook)
 
 from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,
-    AutomationCreate,AutomationUpdate,)
+    AutomationCreate,AutomationUpdate,WebhookCreate,WebhookUpdate)
 
 from app.permissions import is_workspace_member
 
@@ -768,4 +768,151 @@ def get_user_notifications(
     )
 
 
+def create_webhook(
+    db: Session,
+    workspace_id: int,
+    webhook_data: WebhookCreate,
+):
+    workspace = is_workspace_exist(db, workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
+    data = webhook_data.model_dump(mode="json")
+
+    c_webhook = Webhook(
+        workspace_id=workspace_id,
+        **data,
+    )
+
+    db.add(c_webhook)
+    db.commit()
+    db.refresh(c_webhook)
+
+    return c_webhook
+
+
+def get_webhooks(
+    db: Session,
+    workspace_id: int,
+):
+    workspace = is_workspace_exist(db, workspace_id)
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Workspace not found",
+        )
+
+    return (
+        db.query(Webhook)
+        .filter(Webhook.workspace_id == workspace_id)
+        .order_by(
+            Webhook.created_at.desc(),
+            Webhook.id.desc(),
+        )
+        .all()
+    )
+
+
+def get_webhook(
+    db: Session,
+    webhook_id: int,
+    workspace_id: int,
+):
+    webhook = (
+        db.query(Webhook)
+        .filter(
+            Webhook.id == webhook_id,
+            Webhook.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if webhook is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Webhook not found",
+        )
+
+    return webhook
+
+
+def update_webhook(
+    db: Session,
+    webhook_id: int,
+    workspace_id: int,
+    webhook_data: WebhookUpdate,
+):
+    u_webhook = (
+        db.query(Webhook)
+        .filter(
+            Webhook.id == webhook_id,
+            Webhook.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if u_webhook is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Webhook not found",
+        )
+
+    update_data = webhook_data.model_dump(
+        mode="json",
+        exclude_unset=True,
+    )
+
+    required_fields = {
+        "url",
+        "events",
+        "is_active",
+    }
+
+    for field in required_fields:
+        if field in update_data and update_data[field] is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} cannot be null",
+            )
+
+    for field, value in update_data.items():
+        setattr(u_webhook, field, value)
+
+    db.commit()
+    db.refresh(u_webhook)
+
+    return u_webhook
+
+
+def delete_webhook(
+    db: Session,
+    webhook_id: int,
+    workspace_id: int,
+):
+    d_webhook = (
+        db.query(Webhook)
+        .filter(
+            Webhook.id == webhook_id,
+            Webhook.workspace_id == workspace_id,
+        )
+        .first()
+    )
+
+    if d_webhook is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Webhook not found",
+        )
+
+    db.delete(d_webhook)
+    db.commit()
+
+    return {
+        "detail": "Webhook deleted successfully"
+    }
 
