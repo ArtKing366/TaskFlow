@@ -18,14 +18,37 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=list[AutomationCreate])
-def create_automations_endpoint():
-    pass
+@router.post("/",response_model=AutomationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_automation_endpoint(
+    workspace_id: int,
+    automation_data: AutomationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_editor(current_user, workspace_id, db)
+
+    return crud.create_automation(
+        db,
+        workspace_id,
+        automation_data,
+    )
 
 
-@router.get("/", response_model=list[AutomationResponse])
-def list_automations():
-    pass
+
+@router.get("/",response_model=list[AutomationResponse],)
+def list_automations(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_member(current_user, workspace_id, db)
+
+    return crud.get_automations(
+        db,
+        workspace_id,
+    )
 
 
 @router.get("/{automation_id}", response_model=list[AutomationResponse])
