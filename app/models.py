@@ -360,3 +360,29 @@ class WebhookDelivery(Base):
         server_default=func.now(),
         nullable=False,
     )
+    
+    
+class IdempotencyRecord(Base):
+    __tablename__ = "idempotency_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    endpoint = Column(String(255), nullable=False)
+    key = Column(String(255), nullable=False)
+    request_hash = Column(String(64), nullable=False)
+    status = Column(String(20), nullable=False, default="processing")
+    response_body = Column(JSON, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "endpoint",
+            "key",
+            name="uq_idempotency_user_endpoint_key",
+        ),
+    )
