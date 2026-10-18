@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from fastapi import Header
+from app.idempotency import execute_idempotent
 from fastapi.encoders import jsonable_encoder
 
 from app.redis_cache import get_cached_json, set_cached_json
@@ -100,6 +101,12 @@ def create_task(
     workspace_id: int,
     project_id: int,
     task_data: TaskCreate,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=255,
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -111,11 +118,21 @@ def create_task(
             detail="Project ID in the URL and request body must match",
         )
 
-    return crud.create_task(
-        db,
-        task_data,
-        workspace_id,
-        current_user.id,
+    return execute_idempotent(
+        db=db,
+        user_id=current_user.id,
+        endpoint=(
+            f"POST:/workspaces/{workspace_id}"
+            f"/projects/{project_id}/tasks"
+        ),
+        key=idempotency_key,
+        request_data=task_data,
+        operation=lambda: crud.create_task(
+            db,
+            task_data,
+            workspace_id,
+            current_user.id,
+        ),
     )
 
 

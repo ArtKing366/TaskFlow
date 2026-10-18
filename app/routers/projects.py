@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from fastapi import Header
+from app.idempotency import execute_idempotent
 from app import crud
 from app.auth import get_current_user
 from app.database import get_db
@@ -71,6 +72,12 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=255,
+    ),
     require_editor(current_user, workspace_id, db)
 
     if project_data.workspace_id != workspace_id:
@@ -79,7 +86,18 @@ def create_project(
             detail="Workspace ID in the URL and request body must match",
         )
 
-    return crud.create_project(db, project_data,current_user.id,)
+    return execute_idempotent(
+        db=db,
+        user_id=current_user.id,
+        endpoint=f"POST:/workspaces/{workspace_id}/projects",
+        key=idempotency_key,
+        request_data=project_data,
+        operation=lambda: crud.create_project(
+            db,
+            project_data,
+            current_user.id,
+        ),
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

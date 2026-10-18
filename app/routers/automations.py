@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-
+from fastapi import Header
+from app.idempotency import execute_idempotent
 from app import crud
 from app.auth import get_current_user
 from app.database import get_db
@@ -27,15 +28,28 @@ router = APIRouter(
 def create_automation_endpoint(
     workspace_id: int,
     automation_data: AutomationCreate,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=255,
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_editor(current_user, workspace_id, db)
 
-    return crud.create_automation(
-        db,
-        workspace_id,
-        automation_data,
+    return execute_idempotent(
+        db=db,
+        user_id=current_user.id,
+        endpoint=f"POST:/workspaces/{workspace_id}/automations",
+        key=idempotency_key,
+        request_data=automation_data,
+        operation=lambda: crud.create_automation(
+            db,
+            workspace_id,
+            automation_data,
+        ),
     )
 
 
