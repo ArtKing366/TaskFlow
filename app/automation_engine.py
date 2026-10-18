@@ -26,8 +26,13 @@ def condition_matches(task: Task,condition: dict | None,) -> bool:
     return actual_value == expected_value
 
 
-def send_notification(db: Session,automation: Automation,task: Task,workspace_id: int,
+def send_notification(
+    db: Session,
+    automation: Automation,
+    task: Task,
+    workspace_id: int,
 ) -> None:
+
     action = automation.action
 
     if not isinstance(action, dict):
@@ -36,32 +41,28 @@ def send_notification(db: Session,automation: Automation,task: Task,workspace_id
     if action.get("type") != "send_notification":
         return
 
-    if action.get("recipients") != "workspace_members":
+    recipients = action.get("recipients")
+
+    if recipients != "workspace_members":
         return
 
-    memberships = (
-        db.query(Membership)
-        .filter(Membership.workspace_id == workspace_id)
-        .all()
+    from app.celery_tasks import create_notifications
+
+    create_notifications.delay(
+        workspace_id,
+        task.id,
+        automation.name,
+        recipients,
     )
 
-    message = (
-        f'Task "{task.title}" was completed '
-        f'by automation "{automation.name}".'
-    )
 
-    for membership in memberships:
-        notification = Notification(
-            user_id=membership.user_id,
-            workspace_id=workspace_id,
-            task_id=task.id,
-            message=message,
-        )
+def dispatch_event(
+    db: Session,
+    workspace_id: int,
+    event_name: str,
+    task: Task,
+) -> None:
 
-    db.add(notification)
-
-
-def dispatch_event(db: Session,workspace_id: int,event_name: str,task: Task,) -> None:
     automations = (
         db.query(Automation)
         .filter(
@@ -76,13 +77,9 @@ def dispatch_event(db: Session,workspace_id: int,event_name: str,task: Task,) ->
         if not condition_matches(task, automation.condition):
             continue
 
-        if (
-            isinstance(automation.action, dict)
-            and automation.action.get("type") == "send_notification"
-        ):
-            send_notification(
-                db=db,
-                automation=automation,
-                task=task,
-                workspace_id=workspace_id,
-            )
+        send_notification(
+            db=db,
+            automation=automation,
+            task=task,
+            workspace_id=workspace_id,
+        )

@@ -2,6 +2,7 @@ import ipaddress
 import socket
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
+from app.celery_tasks import send_webhook
 
 import httpx
 from sqlalchemy.orm import Session
@@ -97,7 +98,6 @@ def dispatch_webhooks(
     event_name: str,
     data: dict,
 ) -> None:
-
     webhooks = (
         db.query(Webhook)
         .filter(
@@ -114,6 +114,7 @@ def dispatch_webhooks(
         and event_name in webhook.events
     ]
 
+
     for webhook_id, url in matching_webhooks:
         delivery = WebhookDelivery(
             webhook_id=webhook_id,
@@ -126,8 +127,10 @@ def dispatch_webhooks(
         db.commit()
         db.refresh(delivery)
 
+        delivery_id = delivery.id
+
         payload = {
-            "delivery_id": delivery.id,
+            "delivery_id": delivery_id,
             "event": event_name,
             "workspace_id": workspace_id,
             "occurred_at": datetime.now(timezone.utc).isoformat(),
@@ -135,33 +138,25 @@ def dispatch_webhooks(
         }
 
         try:
-            validate_webhook_url(url)
-
-            delivery.attempts += 1
-            db.commit()
-
-            response = httpx.post(
+            send_webhook.delay(
+                delivery_id,
                 url,
-                json=payload,
-                headers={
-                    "X-TaskFlow-Event": event_name,
-                    "X-TaskFlow-Delivery": str(delivery.id),
-                },
-                timeout=10.0,
-                follow_redirects=False,
+                payload,
             )
 
-            response.raise_for_status()
-
-            delivery.status = "success"
-            delivery.last_error = None
-
-        except (httpx.HTTPError, ValueError, OSError) as exc:
-            delivery.status = "failed"
-            delivery.last_error = str(exc)[:4000]
-
-        try:
-            db.commit()
-        except Exception:
+        except Exception as exc:
             db.rollback()
-            raise
+
+            failed_delivery = (
+                db.query(WebhookDelivery)
+                .filter(WebhookDelivery.id == delivery_id)
+                .first()
+            )
+
+            if failed_delivery is not None:
+                failed_delivery.status = "failed"
+                failed_delivery.last_error = (
+                    f"Failed to enqueue Celery task: {exc}"
+                )[:4000]
+
+                db.commit()

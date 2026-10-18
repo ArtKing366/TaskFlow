@@ -401,6 +401,13 @@ def update_task(
         )
 
         if became_completed:
+            dispatch_event(
+                db=db,
+                workspace_id=workspace_id,
+                event_name="task.completed",
+                task=u_task,
+            )
+
             dispatch_webhooks(
                 db=db,
                 workspace_id=workspace_id,
@@ -412,8 +419,12 @@ def update_task(
 
     return u_task
 
-def complete_task(db: Session,task_id: int,
-    workspace_id: int,user_id: int,):
+def complete_task(
+    db: Session,
+    task_id: int,
+    workspace_id: int,
+    user_id: int,
+):
     c_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -429,9 +440,11 @@ def complete_task(db: Session,task_id: int,
             status_code=404,
             detail="Task not found",
         )
+
     newly_completed = c_task.status != TaskStatus.done
+
     try:
-        if c_task.status != TaskStatus.done:
+        if newly_completed:
             c_task.status = TaskStatus.done
 
             db.flush()
@@ -445,13 +458,6 @@ def complete_task(db: Session,task_id: int,
                 entity_id=c_task.id,
             )
 
-            dispatch_event(
-                db=db,
-                workspace_id=workspace_id,
-                event_name="task.completed",
-                task=c_task,
-            )
-
         db.commit()
 
     except Exception:
@@ -460,7 +466,15 @@ def complete_task(db: Session,task_id: int,
 
     db.refresh(c_task)
 
+    # После commit: задача и аудит уже сохранены.
     if newly_completed:
+        dispatch_event(
+            db=db,
+            workspace_id=workspace_id,
+            event_name="task.completed",
+            task=c_task,
+        )
+
         dispatch_webhooks(
             db=db,
             workspace_id=workspace_id,
