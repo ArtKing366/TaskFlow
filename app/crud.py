@@ -1,15 +1,15 @@
-
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.automation_engine import dispatch_event
 from app.models import (Project,Workspace,Task,TaskTag,User,TaskStatus,AuditLog,   
-    AuditLog,Automation,Notification,Webhook)
+    Automation,Notification,Webhook)
 
 from app.schemas import (ProjectCreate,ProjectUpdate,TaskCreate,TaskUpdate,TaskPriority,
     AutomationCreate,AutomationUpdate,WebhookCreate,WebhookUpdate)
 
 from app.permissions import is_workspace_member
 from app.webhook_service import (dispatch_webhooks,project_payload,task_payload,validate_webhook_url,)
+from app.redis_cache import invalidate_workspace_cache
 
 
 def is_workspace_exist(db: Session, workspace_id: int):
@@ -85,6 +85,7 @@ def create_project(
     )
 
     db.commit()
+    invalidate_workspace_cache(c_project.workspace_id)
     db.refresh(c_project)
 
     dispatch_webhooks(
@@ -138,6 +139,7 @@ def update_project(
     )
 
     db.commit()
+    invalidate_workspace_cache(workspace_id)
     db.refresh(u_project)
 
     return u_project
@@ -187,6 +189,7 @@ def delete_project(
 
     db.delete(d_project)
     db.commit()
+    invalidate_workspace_cache(workspace_id)
 
     return {"detail": "Project deleted successfully"}
 
@@ -310,6 +313,7 @@ def create_task(
     )
 
     db.commit()
+    invalidate_workspace_cache(workspace_id)
     db.refresh(c_task)
 
     return c_task
@@ -322,7 +326,6 @@ def update_task(
     task_update: TaskUpdate,
     user_id: int,
 ):
-    old_status = u_task.status
     u_task = (
         db.query(Task)
         .join(Project, Task.project_id == Project.id)
@@ -332,12 +335,14 @@ def update_task(
         )
         .first()
     )
-
+    
     if u_task is None:
         raise HTTPException(
             status_code=404,
             detail="Task not found",
         )
+
+    old_status = u_task.status
 
     update_data = task_update.model_dump(exclude_unset=True)
 
@@ -388,6 +393,7 @@ def update_task(
     )
 
     db.commit()
+    invalidate_workspace_cache(workspace_id)
     db.refresh(u_task)
 
     if update_data:
@@ -459,6 +465,7 @@ def complete_task(
             )
 
         db.commit()
+        invalidate_workspace_cache(workspace_id)
 
     except Exception:
         db.rollback()
@@ -466,7 +473,6 @@ def complete_task(
 
     db.refresh(c_task)
 
-    # После commit: задача и аудит уже сохранены.
     if newly_completed:
         dispatch_event(
             db=db,
@@ -548,6 +554,7 @@ def assign_task(
         )
 
     db.commit()
+    invalidate_workspace_cache(workspace_id)
     db.refresh(a_task)
 
     return a_task
@@ -588,6 +595,7 @@ def delete_task(
 
     db.delete(d_task)
     db.commit()
+    invalidate_workspace_cache(workspace_id)
 
     return {"detail": "Task deleted successfully"}
 
@@ -988,4 +996,3 @@ def delete_webhook(
     return {
         "detail": "Webhook deleted successfully"
     }
-

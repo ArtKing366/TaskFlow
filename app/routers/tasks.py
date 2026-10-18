@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from fastapi.encoders import jsonable_encoder
+
+from app.redis_cache import get_cached_json, set_cached_json
+
 from app import crud
 from app.auth import get_current_user
 from app.database import get_db
@@ -48,9 +52,24 @@ def read_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+
     require_member(current_user, workspace_id, db)
 
-    return crud.filter_tasks(
+    cache_key = (
+        f"taskflow:cache:tasks:workspace:{workspace_id}:"
+        f"project:{project_id}:"
+        f"status:{status.value if status else 'all'}:"
+        f"priority:{priority.value if priority else 'all'}:"
+        f"assignee:{assignee_id if assignee_id is not None else 'all'}:"
+        f"search:{search.strip() if search and search.strip() else ''}"
+    )
+
+    cached_tasks = get_cached_json(cache_key)
+
+    if cached_tasks is not None:
+        return cached_tasks
+
+    tasks = crud.filter_tasks(
         db=db,
         project_id=project_id,
         workspace_id=workspace_id,
@@ -59,6 +78,17 @@ def read_tasks(
         assignee_id=assignee_id,
         search=search,
     )
+
+    tasks_data = jsonable_encoder(tasks)
+
+    set_cached_json(
+        cache_key,
+        tasks_data,
+        ttl=300,
+    )
+
+    return tasks_data
+
 
 
 @router.post(

@@ -8,6 +8,13 @@ from app.models import User, Role
 from app.permissions import require_member
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 
+from fastapi.encoders import jsonable_encoder
+
+from app.redis_cache import (
+    get_cached_json,
+    set_cached_json,
+)
+
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/projects",
@@ -29,6 +36,7 @@ def require_editor(
         )
 
 
+
 @router.get("/", response_model=list[ProjectResponse])
 def read_projects(
     workspace_id: int,
@@ -37,7 +45,23 @@ def read_projects(
 ):
     require_member(current_user, workspace_id, db)
 
-    return crud.get_projects(db, workspace_id)
+    cache_key = (
+        f"taskflow:cache:projects:workspace:{workspace_id}:list"
+    )
+
+    cached_projects = get_cached_json(cache_key)
+
+    if cached_projects is not None:
+        return cached_projects
+
+    projects = crud.get_projects(db, workspace_id)
+
+    projects_data = jsonable_encoder(projects)
+
+    set_cached_json(cache_key, projects_data, ttl=300)
+
+    return projects_data
+
 
 
 @router.post("/", response_model=ProjectResponse, status_code=201)

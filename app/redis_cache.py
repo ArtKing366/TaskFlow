@@ -75,3 +75,16 @@ def check_cache_connection() -> bool:
         return bool(redis_cache.ping())
     except RedisError:
         return False
+    
+    
+
+def invalidate_workspace_cache(workspace_id: int) -> None:
+
+    delete_cache_key(
+        f"taskflow:cache:projects:workspace:{workspace_id}:list"
+    )
+
+    delete_cache_pattern(
+        f"taskflow:cache:tasks:workspace:{workspace_id}:*"
+    )
+
