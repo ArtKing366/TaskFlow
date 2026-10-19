@@ -69,15 +69,15 @@ def read_projects(
 def create_project(
     workspace_id: int,
     project_data: ProjectCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
     idempotency_key: str = Header(
         ...,
         alias="Idempotency-Key",
         min_length=1,
         max_length=255,
     ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     require_editor(current_user, workspace_id, db)
 
     if project_data.workspace_id != workspace_id:
