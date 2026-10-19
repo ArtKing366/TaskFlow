@@ -2,7 +2,6 @@ import ipaddress
 import socket
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
-from app.celery_tasks import send_webhook
 
 import httpx
 from sqlalchemy.orm import Session
@@ -98,6 +97,8 @@ def dispatch_webhooks(
     event_name: str,
     data: dict,
 ) -> None:
+    from app.celery_tasks import send_webhook
+    
     webhooks = (
         db.query(Webhook)
         .filter(

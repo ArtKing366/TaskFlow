@@ -1,7 +1,6 @@
 from app.models import User, Membership,Role
 from sqlalchemy.orm import Session
-from app.database import get_db
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 
 
 def is_workspace_member(user: User,workspace_id: int,db: Session):
@@ -55,7 +54,24 @@ def require_owner(user: User,workspace_id: int,db: Session) -> Membership:
 
     return membership
 
+def require_editor(
+    current_user: User,
+    workspace_id: int,
+    db: Session,
+):
+    membership = require_member(
+        current_user,
+        workspace_id,
+        db,
+    )
 
+    if membership.role == Role.viewer:
+        raise HTTPException(
+            status_code=403,
+            detail="Viewers cannot modify this resource",
+        )
+
+    return membership
 
 
 
