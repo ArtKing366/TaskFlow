@@ -44,7 +44,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   try {
     response = await fetch(`${API_BASE}${path}`, { ...options, headers });
   } catch {
-    throw new ApiError('Не удалось соединиться с API. Проверь, запущен ли FastAPI на порту 8000.', 0);
+    throw new ApiError('Failed to connect to the API. Check if FastAPI is running on port 8000..', 0);
   }
 
   if (response.status === 204) return null as T;
